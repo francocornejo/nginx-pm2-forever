@@ -1,13 +1,17 @@
 const express = require('express')
 const session = require('express-session')
 const passport = require('passport')
-const path = require('path')
-const localStrategy = require("passport-local").Strategy
+const bcrypt = require('bcrypt')
+const exphbs = require ('express-handlebars')
+const LocalStrategy = require("passport-local").Strategy
 const mongoose = require('mongoose')
 const app = express()
 const controller = require('./controller/script')
 const Usuario = require('./models/models')
 port = 8080
+
+app.engine(".hbs", exphbs({ extname: ".hbs", defaultLayout: "main.hbs" }));
+app.set("view engine", ".hbs");
 
 app.use(express.static(__dirname + "/views"));
 app.use(express.json());
@@ -30,7 +34,15 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-const registerStrategy = new localStrategy(
+function hashPassword(password) {
+    return bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+}
+  
+function isValidPassword(reqPassword, hashedPassword) {
+    return bcrypt.compareSync(reqPassword, hashedPassword);
+}
+
+const registerStrategy = new LocalStrategy(
     {passReqToCallback: true},
 
     async (req, username, password, done) =>{
@@ -42,7 +54,7 @@ const registerStrategy = new localStrategy(
             }else{
                 const nuevoUsuario = {
                     username: username,
-                    password: password,
+                    password: hashPassword(password),
                     email: req.body.email,
                     firstName: req.body.firstName,
                     lastName: req.body.lastName
@@ -50,7 +62,7 @@ const registerStrategy = new localStrategy(
 
                 const crearUsuario = await Usuario.create(nuevoUsuario)
 
-                return done('Usuario creado con exito', crearUsuario)
+                return done(null, crearUsuario)
             }
 
         }catch(err){
@@ -61,24 +73,60 @@ const registerStrategy = new localStrategy(
 
 )
 
-passport.use('register', registerStrategy)
+const loginStrategy = new LocalStrategy(
+    async(username, password, done) => {
+        const user = await Usuario.findOne({username})
 
-app.get("/login", (req, res) => {
-    res.sendFile(path.join(__dirname + "/views/login.html"))
-})
+        if(!user || !isValidPassword(password, user.password)){
+            return done("Credenciales invalidas", null)
+        }
 
-app.get("/register", (req, res) =>{
-    res.sendFile(path.join(__dirname + "/views/register.html"))
-})
+        return done(null, user)
+    }
+)
 
-app.post("/register", passport.authenticate('register', {failureRedirect: "/errorRegister"}), 
+passport.use("register", registerStrategy)
+passport.use("login", loginStrategy)
+
+passport.serializeUser((user, done) => {
+    done(null, user._id);
+});
+  
+passport.deserializeUser((id, done) => {
+    Usuario.findById(id, done);
+});
+  
+app.get("/login", controller.getLogin)
+
+app.post("/login", passport.authenticate("login", {failureRedirect: "/faillogin"}),
+    controller.postLogin
+)
+
+app.get("/register", controller.getSignup)
+
+app.post("/register", passport.authenticate("register", { failureRedirect: "/failsignup"}), 
     controller.postRegister
 )
 
-app.get("/errorRegister", ( req, res ) => {
-    res.render("Registro erroneo", {})
-})
+app.get('/faillogin', controller.getFaillogin)
 
+app.get("/failsignup", controller.getFailsignup);
+
+app.get('/logout', controller.getLogout)
+
+function checkAuth(req, res, next) {
+    if (req.isAuthenticated()) {
+      next();
+    } else {
+      res.redirect("/login");
+    }
+  }
+  
+  app.get("/ruta-protegida", checkAuth, (req, res) => {
+    const { user } = req;
+    console.log(user);
+    res.send("<h1>Ruta protegida!</h1>");
+  });
 
 
 function Main() {
@@ -89,16 +137,18 @@ function Main() {
             console.log("Error al conectar base de datos")
         }else {
             console.log('BASE DE DATOS CONECTADA')
+
+            app.listen(port, (err) => {
+                if(!err){
+                    console.log(`Servidor escuchando puerto ${port}`)
+                }else {
+                    console.log('Error al escuchar el puerto')
+                }
+            })
+            
         }
     } )
 }
 
-app.listen(port, (err) => {
-    if(!err){
-        console.log(`Servidor escuchando puerto ${port}`)
-    }else {
-        console.log('Error al escuchar el puerto')
-    }
-})
-
 Main()
+
