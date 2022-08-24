@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express')
 const session = require('express-session')
 const passport = require('passport')
@@ -8,7 +9,17 @@ const mongoose = require('mongoose')
 const app = express()
 const controller = require('./controller/script')
 const Usuario = require('./models/models')
-port = 8080
+const util = require('util');
+
+const yargs = require('yargs')(process.argv.slice(2))
+const args = yargs
+    .alias({
+        p: "puerto",
+    }).default({
+        puerto: 3000
+    }).argv
+
+const port = args.puerto;
 
 app.engine(".hbs", exphbs({ extname: ".hbs", defaultLayout: "main.hbs" }));
 app.set("view engine", ".hbs");
@@ -120,17 +131,39 @@ function checkAuth(req, res, next) {
     } else {
       res.redirect("/login");
     }
-  }
+}
   
-  app.get("/ruta-protegida", checkAuth, (req, res) => {
-    const { user } = req;
-    console.log(user);
-    res.send("<h1>Ruta protegida!</h1>");
-  });
+app.get("/ruta-protegida", checkAuth, (req, res) => {
+const { user } = req;
+console.log(user);
+res.send("<h1>Ruta protegida!</h1>");
+});
 
+//
+app.get("/info", (req, res) => {
+    res.send(`
+    <h1>Informacion relevante: </h1>
+    <ul>
+        <li>Argumentos de entrada: ${port}</li>
+        <li>Nombre de la plataforma: ${process.platform}</li>
+        <li>Version de Node: ${process.version}</li>
+        <li>Memoria total reservada: ${util.inspect(process.memoryUsage(),{
+            showHidden: false,
+            depth: null,
+            colors: true
+        })}</li>
+        <li>Path de ejecucion: ${process.execPath}</li>
+        <li>Process ID: ${process.pid}</li>
+        <li>Carpeta del proyecto: ${process.cwd()}</li>
+    </ul>`)
+})
+
+
+const yargRoute = require('./router/route')
+app.use('/', yargRoute)
 
 function Main() {
-    const URL = "mongodb://localhost:27017/passport"
+    const URL = process.env.URL_MONGO;
 
     mongoose.connect( URL,{ useNewUrlParser: true, useUnifiedTopology: true }, (err) => {
         if(err){
@@ -149,6 +182,4 @@ function Main() {
         }
     } )
 }
-
 Main()
-

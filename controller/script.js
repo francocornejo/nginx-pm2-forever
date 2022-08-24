@@ -49,7 +49,7 @@ function getFaillogin(req, res) {
 
 function getLogout(req, res) {
   req.logout((e)=>{console.log(e)});
-  res.sendFile("C:/Users/fedec/OneDrive/Escritorio/DesafioWebSocket/ProgramacionBackEnd/Passport/views/index.html");
+  res.sendFile(path.join(__dirname, "../views/index.html"))
 }
 
 module.exports = {
