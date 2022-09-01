@@ -10,23 +10,34 @@ const app = express()
 const controller = require('./controller/script')
 const Usuario = require('./models/models')
 const util = require('util');
+/*const {hideBin} = require("yargs/helpers")
 
 const yargs = require('yargs')(process.argv.slice(2))
-const args = yargs
+const args = yargs(hideBin(process.argv))
     .alias({
-        p: "puerto",
+        m: "mode",
+        p: "port"
     }).default({
-        puerto: 3000
-    }).argv
+        mode: "fork",
+        port: 3000
+    }).argv*/
 
-const port = args.puerto;
+const os = require('os');
+const cluster = require("cluster");
+const cpus = os.cpus();
+const port = Number(process.argv[2]) || 3000;
+const iscluster = process.argv[3] == "cluster";
+
+//const port = args.puerto;
 
 app.engine(".hbs", exphbs({ extname: ".hbs", defaultLayout: "main.hbs" }));
 app.set("view engine", ".hbs");
 
+//#region
 app.use(express.static(__dirname + "/views"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 
 app.use(
     session({
@@ -53,6 +64,7 @@ function isValidPassword(reqPassword, hashedPassword) {
     return bcrypt.compareSync(reqPassword, hashedPassword);
 }
 
+ 
 const registerStrategy = new LocalStrategy(
     {passReqToCallback: true},
 
@@ -70,18 +82,14 @@ const registerStrategy = new LocalStrategy(
                     firstName: req.body.firstName,
                     lastName: req.body.lastName
                 }
-
                 const crearUsuario = await Usuario.create(nuevoUsuario)
-
                 return done(null, crearUsuario)
             }
-
         }catch(err){
             console.log('Error', err)
             done(err)
         }
     }
-
 )
 
 const loginStrategy = new LocalStrategy(
@@ -138,7 +146,7 @@ const { user } = req;
 console.log(user);
 res.send("<h1>Ruta protegida!</h1>");
 });
-
+//#endregion
 //
 app.get("/info", (req, res) => {
     res.send(`
@@ -155,31 +163,59 @@ app.get("/info", (req, res) => {
         <li>Path de ejecucion: ${process.execPath}</li>
         <li>Process ID: ${process.pid}</li>
         <li>Carpeta del proyecto: ${process.cwd()}</li>
+        <li>Numero de procesadores: ${os.cpus().length}</li>
     </ul>`)
 })
 
+/*const yargRoute = require('./router/route')
+app.use('/', yargRoute)*/
 
-const yargRoute = require('./router/route')
-app.use('/', yargRoute)
+const rutas = require("./router/index")
+if (iscluster && cluster.isPrimary) {
+    cpus.map(() => {
+      cluster.fork();
+    });
 
-function Main() {
+    cluster.on("exit", (worker) => {
+      console.log(`Worker ${worker.process.pid} died`);
+  
+      cluster.fork();
+    });
+  } else {
+    app.use("/", rutas);
+  
+    app.listen(port, () => {
+      console.log(`Server listening port ${port} - Worker: ${process.pid}`);
+    });
+  }
+
+/*function Main() {
     const URL = process.env.URL_MONGO;
 
     mongoose.connect( URL,{ useNewUrlParser: true, useUnifiedTopology: true }, (err) => {
-        if(err){
-            console.log("Error al conectar base de datos")
-        }else {
+        
+        if (isCluster && cluster.isPrimary) {
+            cpus.map(() => {
+              cluster.fork();
+            });
+          
+            cluster.on("exit", (worker) => {
+              console.log(`Worker ${worker.process.pid} died`);
+          
+              cluster.fork();
+            });
+        } else {
             console.log('BASE DE DATOS CONECTADA')
 
             app.listen(port, (err) => {
+
                 if(!err){
                     console.log(`Servidor escuchando puerto ${port}`)
                 }else {
                     console.log('Error al escuchar el puerto')
                 }
             })
-            
         }
-    } )
+    })
 }
-Main()
+Main()*/

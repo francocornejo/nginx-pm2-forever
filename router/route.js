@@ -1,9 +1,9 @@
 const {Router} = require('express')
-const router = Router();
+const routerYarg = Router();
 const forkRandom = require('../controller/yargsController')
 
 //router.get('/info', getInfoFromPC);
 
-router.get('/api/randoms', forkRandom); 
+routerYarg.get('/api/randoms', forkRandom); 
 
-module.exports = router;
+module.exports = routerYarg;

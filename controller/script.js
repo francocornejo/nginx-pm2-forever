@@ -21,30 +21,24 @@ function getSignup(req, res) {
 }
 
 function postRegister(req, res) {
-
     let user = req.user
-
     res.sendFile(path.join(__dirname, "../views/index.html"))
 }
 
 function postLogin(req, res) {
     let user = req.user
-    
     res.sendFile(path.join(__dirname, "../views/index.html"))
 }
 
 function getFailsignup(req, res) {
-
   console.log("error en signup");
   res.render("signup-error", {});
 
 }
 
 function getFaillogin(req, res) {
-
   console.log("error en login");
   res.render("login-error", {});
-
 }
 
 function getLogout(req, res) {
